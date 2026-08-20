@@ -412,6 +412,8 @@ ei_source_dispatch (GSource     *source,
         case EI_EVENT_TOUCH_DOWN:
         case EI_EVENT_TOUCH_UP:
         case EI_EVENT_TOUCH_MOTION:
+        case EI_EVENT_TEXT_KEYSYM:
+        case EI_EVENT_TEXT_UTF8:
         default:
           break;
         }
