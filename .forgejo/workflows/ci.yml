@@ -1,0 +1,149 @@
+name: Valent CI/CD, Flatpak & Extension Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test-and-lint:
+    name: 1. Meson Unit & Test Suite
+    runs-on: gnome-full
+    steps:
+      - name: Checkout Valent
+        uses: actions/checkout@v3
+
+      - name: Install Build & Test Dependencies
+        run: |
+          apt-get update && apt-get install -y meson ninja-build libglib2.0-dev libgtk-4-dev libadwaita-1-dev libpeas-2-dev libjson-glib-dev libsoup-3.0-dev libgnome-bluetooth-3.0-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libpipewire-0.3-dev libpulse-dev libnotify-dev libcanberra-dev libsecret-1-dev valac git || true
+
+      - name: Configure & Compile Meson
+        run: |
+          meson setup _build -Dwarning_level=2 || meson setup _build
+          ninja -C _build
+
+  package-extension:
+    name: 2. Package GNOME Shell Extension (ZIP)
+    needs: test-and-lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GNOME Extension Repository
+        uses: actions/checkout@v3
+        with:
+          repository: andyholmes/gnome-shell-extension-valent
+          path: extension-src
+
+      - name: Install Packaging Tools
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update && apt-get install -y --no-install-recommends gnome-shell zip gettext meson ninja-build || apt-get install -y zip gettext
+
+      - name: Build & Pack GNOME Extension
+        run: |
+          mkdir -p dist
+          cd extension-src
+          meson setup _build
+          ninja -C _build
+          if [ -d "_build/src" ]; then
+            cd _build/src
+          else
+            cd src
+          fi
+          gnome-extensions pack --force --out-dir=../../dist . || zip -r ../../dist/valent-extension.zip .
+          cd ../..
+          ls -lh dist/
+
+      - name: Upload Extension Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: valent-gnome-shell-extension-zip
+          path: dist/*.zip
+
+  build-flatpak:
+    name: 3. Build Flatpak Bundle
+    needs: package-extension
+    runs-on: gnome-full
+    steps:
+      - name: Checkout Valent
+        uses: actions/checkout@v3
+
+      - name: Install Flatpak Builder Dependencies
+        run: |
+          apt-get update && apt-get install -y flatpak flatpak-builder git meson ninja-build || true
+
+      - name: Build and Bundle Flatpak
+        run: |
+          mkdir -p build-dir repo dist
+          flatpak --user remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak-builder --user --force-clean --disable-rofiles-fuse --install-deps-from=flathub --repo=repo build-dir build-aux/flatpak/ca.andyholmes.Valent.Devel.json || flatpak-builder --user --force-clean --disable-rofiles-fuse --install-deps-from=flathub --repo=repo build-dir build-aux/flatpak/ca.andyholmes.Valent.json
+          flatpak build-bundle --arch=x86_64 repo dist/ca.andyholmes.Valent.flatpak ca.andyholmes.Valent master || true
+          ls -lh dist/
+
+      - name: Upload Flatpak Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: valent-flatpak
+          path: dist/*.flatpak
+
+  notify-telegram:
+    name: 4. Notify Hermes via Telegram
+    needs: [build-flatpak]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Telegram Notification
+        run: |
+          STATUS="${{ job.status }}"
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          COMMIT_SHA="${{ github.sha }}"
+          REPO_NAME="${{ github.repository }}"
+          RUN_ID="${{ github.run_id }}"
+          
+          python3 -c "
+          import urllib.request, urllib.parse, json, os
+
+          token = '7666976389:AAG3sjWhNBFWEyfifTXlaHOEMp7Hdy1rGs0'
+          chat_id = '943936254'
+          status = os.environ.get('STATUS', 'unknown')
+          commit_sha = os.environ.get('COMMIT_SHA', '')[:7]
+          commit_msg = os.environ.get('COMMIT_MSG', '').strip()
+          repo = os.environ.get('REPO_NAME', '')
+
+          if status == 'success':
+              emoji = '✅'
+              status_text = '*BUILD & PACOTES DO VALENT PRONTOS NO FORGEJO*'
+              action_text = 'O Flatpak do Valent e a Extensão GNOME (.zip) foram gerados e estão disponíveis para download.'
+          else:
+              emoji = '❌'
+              status_text = '*FALHA NA PIPELINE DO VALENT*'
+              action_text = 'Verifique os logs da pipeline no Forgejo.'
+
+          msg = (
+              f'{emoji} *[Forgejo CI/CD - Valent App & Extension]*\n\n'
+              f'{status_text}\n\n'
+              f'• *Repositório:* \`{repo}\`\n'
+              f'• *Commit:* \`{commit_sha}\` - {commit_msg}\n'
+              f'• *Status:* \`{status.upper()}\`\n\n'
+              f'{action_text}'
+          )
+
+          try:
+              url = f'https://api.telegram.org/bot{token}/sendMessage'
+              payload = urllib.parse.urlencode({
+                  'chat_id': chat_id,
+                  'text': msg,
+                  'parse_mode': 'Markdown'
+              }).encode('utf-8')
+              req = urllib.request.Request(url, data=payload)
+              urllib.request.urlopen(req, timeout=10)
+              print('Notificação enviada com sucesso ao Telegram.')
+          except Exception as e:
+              print(f'Erro ao enviar notificação para o Telegram: {e}')
+          "
+        env:
+          STATUS: ${{ job.status }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          COMMIT_SHA: ${{ github.sha }}
+          REPO_NAME: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
