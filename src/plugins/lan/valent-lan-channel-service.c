@@ -1028,6 +1028,141 @@ valent_lan_channel_service_channel (ValentChannelService *service,
 }
 
 static void
+valent_lan_channel_service_identify_tailscale (ValentLanChannelService *self)
+{
+  g_autoptr (GSocket) socket = NULL;
+  g_autoptr (GSocketAddress) saddr = NULL;
+  g_autoptr (GSocketConnection) connection = NULL;
+  g_autoptr (GInputStream) istream = NULL;
+  g_autoptr (GOutputStream) ostream = NULL;
+  g_autoptr (GDataInputStream) dstream = NULL;
+  g_autoptr (GError) error = NULL;
+  g_autoptr (JsonParser) parser = NULL;
+  JsonNode *root = NULL;
+  JsonObject *root_obj = NULL;
+  JsonObject *peers = NULL;
+  JsonObjectIter iter;
+  const char *member_name = NULL;
+  JsonNode *peer_node = NULL;
+  const char *request = "GET /localapi/v0/status HTTP/1.1\r\nHost: local-tailscaled.sock\r\n\r\n";
+  const char *socket_path = "/var/run/tailscale/tailscaled.sock";
+  g_autofree char *header_line = NULL;
+  g_autoptr (GByteArray) body_bytes = NULL;
+
+  if (access (socket_path, F_OK) != 0)
+    return;
+
+  socket = g_socket_new (G_SOCKET_FAMILY_UNIX,
+                         G_SOCKET_TYPE_STREAM,
+                         G_SOCKET_PROTOCOL_DEFAULT,
+                         NULL);
+  if (socket == NULL)
+    return;
+
+  saddr = g_unix_socket_address_new (socket_path);
+  if (!g_socket_connect (socket, saddr, NULL, NULL))
+    return;
+
+  connection = g_socket_connection_factory_create_connection (socket);
+  if (connection == NULL)
+    return;
+
+  ostream = g_io_stream_get_output_stream (G_IO_STREAM (connection));
+  istream = g_io_stream_get_input_stream (G_IO_STREAM (connection));
+
+  if (!g_output_stream_write_all (ostream, request, strlen (request), NULL, NULL, &error))
+    return;
+
+  dstream = g_data_input_stream_new (istream);
+  g_data_input_stream_set_newline_type (dstream, G_DATA_STREAM_NEWLINE_TYPE_CR_LF);
+
+  /* Read HTTP response status line */
+  header_line = g_data_input_stream_read_line (dstream, NULL, NULL, &error);
+  if (header_line == NULL || !g_str_has_prefix (header_line, "HTTP/1.1 200"))
+    return;
+
+  /* Read headers until empty line */
+  while (TRUE)
+    {
+      g_autofree char *line = g_data_input_stream_read_line (dstream, NULL, NULL, NULL);
+      if (line == NULL || *line == '\0')
+        break;
+    }
+
+  /* Read JSON body */
+  body_bytes = g_byte_array_new ();
+  while (TRUE)
+    {
+      guint8 buffer[4096];
+      gssize n_read = g_input_stream_read (istream, buffer, sizeof (buffer), NULL, NULL);
+      if (n_read <= 0)
+        break;
+      g_byte_array_append (body_bytes, buffer, (guint)n_read);
+    }
+
+  if (body_bytes->len == 0)
+    return;
+
+  parser = json_parser_new ();
+  if (!json_parser_load_from_data (parser, (const char *)body_bytes->data, body_bytes->len, NULL))
+    return;
+
+  root = json_parser_get_root (parser);
+  if (root == NULL || !JSON_NODE_HOLDS_OBJECT (root))
+    return;
+
+  root_obj = json_node_get_object (root);
+  if (!json_object_has_member (root_obj, "Peer"))
+    return;
+
+  peers = json_object_get_object_member (root_obj, "Peer");
+  if (peers == NULL)
+    return;
+
+  json_object_iter_init (&iter, peers);
+  while (json_object_iter_next (&iter, &member_name, &peer_node))
+    {
+      JsonObject *peer_obj = NULL;
+      JsonArray *ips_arr = NULL;
+      gboolean online = FALSE;
+
+      if (!JSON_NODE_HOLDS_OBJECT (peer_node))
+        continue;
+
+      peer_obj = json_node_get_object (peer_node);
+      if (json_object_has_member (peer_obj, "Online"))
+        online = json_object_get_boolean_member (peer_obj, "Online");
+
+      if (!online)
+        continue;
+
+      if (!json_object_has_member (peer_obj, "TailscaleIPs"))
+        continue;
+
+      ips_arr = json_object_get_array_member (peer_obj, "TailscaleIPs");
+      if (ips_arr == NULL)
+        continue;
+
+      for (guint i = 0; i < json_array_get_length (ips_arr); i++)
+        {
+          const char *ip_str = json_array_get_string_element (ips_arr, i);
+          g_autoptr (GSocketConnectable) net = NULL;
+
+          if (ip_str == NULL || *ip_str == '\0')
+            continue;
+
+          /* Only connect to IPv4 (100.x.y.z) */
+          if (strchr (ip_str, ':') != NULL)
+            continue;
+
+          net = g_network_address_parse (ip_str, VALENT_LAN_PROTOCOL_PORT, NULL);
+          if (net != NULL)
+            valent_lan_channel_service_socket_queue_resolve (self, net);
+        }
+    }
+}
+
+static void
 valent_lan_channel_service_identify (ValentChannelService *service,
                                      const char           *target)
 {
@@ -1072,6 +1207,10 @@ valent_lan_channel_service_identify (ValentChannelService *service,
       address = g_inet_socket_address_new_from_string (self->broadcast_address,
                                                        self->port);
       valent_lan_channel_service_socket_queue (self, address);
+
+      /* Identify to online Tailscale network peers
+       */
+      valent_lan_channel_service_identify_tailscale (self);
     }
 }
 
