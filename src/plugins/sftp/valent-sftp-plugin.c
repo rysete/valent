@@ -139,10 +139,14 @@ sftp_session_new (ValentSftpPlugin *self,
   session->port = (uint16_t)port;
   session->paths = g_hash_table_new_full (g_str_hash, g_str_equal,
                                           g_free, g_free);
-  session->uri = g_strdup_printf ("sftp://%s:%u/", session->host, session->port);
 
   if (valent_packet_get_string (packet, "user", &username))
     session->username = g_strdup (username);
+
+  if (session->username != NULL)
+    session->uri = g_strdup_printf ("sftp://%s@%s:%u/", session->username, session->host, session->port);
+  else
+    session->uri = g_strdup_printf ("sftp://%s:%u/", session->host, session->port);
 
   if (valent_packet_get_string (packet, "password", &password))
     session->password = g_strdup (password);
@@ -159,10 +163,18 @@ sftp_session_new (ValentSftpPlugin *self,
           const char *name = json_array_get_string_element (path_names, i);
           g_autofree char *uri = NULL;
 
-          uri = g_strdup_printf ("sftp://%s:%u%s",
-                                 session->host,
-                                 session->port,
-                                 path);
+          if (session->username != NULL)
+            uri = g_strdup_printf ("sftp://%s@%s:%u%s",
+                                   session->username,
+                                   session->host,
+                                   session->port,
+                                   path);
+          else
+            uri = g_strdup_printf ("sftp://%s:%u%s",
+                                   session->host,
+                                   session->port,
+                                   path);
+
           g_hash_table_replace (session->paths,
                                 g_steal_pointer (&uri),
                                 g_strdup (name));
