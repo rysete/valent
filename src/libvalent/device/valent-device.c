@@ -1634,14 +1634,48 @@ on_channel_destroy (ValentObject *object,
 }
 
 static inline int
+get_channel_score (ValentChannel *channel)
+{
+  const char *type_name = G_OBJECT_TYPE_NAME (channel);
+
+  if (g_str_equal (type_name, "ValentLanChannel"))
+    {
+      GParamSpec *pspec = g_object_class_find_property (G_OBJECT_GET_CLASS (channel), "host");
+      if (pspec != NULL)
+        {
+          g_autofree char *host = NULL;
+          g_object_get (channel, "host", &host, NULL);
+          if (host != NULL)
+            {
+              /* Tailscale IPs start with 100. (Carrier-grade NAT / Mesh) */
+              if (g_str_has_prefix (host, "100."))
+                return 10; /* Tailscale Mesh VPN */
+              else
+                return 0;  /* Local Direct LAN Wi-Fi (highest priority) */
+            }
+        }
+      return 5;
+    }
+  else if (g_str_equal (type_name, "ValentBluezChannel"))
+    {
+      return 20; /* Bluetooth RFCOMM / BLE Fallback */
+    }
+
+  return 30;
+}
+
+static inline int
 channel_sort_func (gconstpointer a,
                   gconstpointer b,
                   gpointer      user_data)
 {
-  if (g_str_equal (G_OBJECT_TYPE_NAME (a), G_OBJECT_TYPE_NAME (b)))
+  int score_a = get_channel_score ((ValentChannel *)a);
+  int score_b = get_channel_score ((ValentChannel *)b);
+
+  if (score_a == score_b)
     return 0;
 
-  return g_str_equal (G_OBJECT_TYPE_NAME (a), "ValentLanChannel") ? -1 : 1;
+  return (score_a < score_b) ? -1 : 1;
 }
 
 /**
