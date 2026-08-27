@@ -77,6 +77,7 @@
     <file preprocess="json-stripblanks" alias="plugin-mousepad.json">data/plugin-mousepad.json</file>
     <file preprocess="json-stripblanks" alias="plugin-mpris.json">data/plugin-mpris.json</file>
     <file preprocess="json-stripblanks" alias="plugin-notification.json">data/plugin-notification.json</file>
+    <file preprocess="json-stripblanks" alias="plugin-p2p.json">data/plugin-p2p.json</file>
     <file preprocess="json-stripblanks" alias="plugin-ping.json">data/plugin-ping.json</file>
     <file preprocess="json-stripblanks" alias="plugin-presenter.json">data/plugin-presenter.json</file>
     <file preprocess="json-stripblanks" alias="plugin-runcommand.json">data/plugin-runcommand.json</file>
@@ -87,4 +88,3 @@
     <file preprocess="json-stripblanks" alias="plugin-telephony.json">data/plugin-telephony.json</file>
   </gresource>
 </gresources>
-

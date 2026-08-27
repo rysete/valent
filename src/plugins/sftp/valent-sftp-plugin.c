@@ -97,6 +97,79 @@ typedef struct _ValentSftpSession
   char       *uri;
 } ValentSftpSession;
 
+static char *
+sftp_format_host (const char *host)
+{
+  g_assert (host != NULL);
+
+  if (strchr (host, ':') != NULL)
+    return g_strdup_printf ("[%s]", host);
+
+  return g_strdup (host);
+}
+
+static char *
+sftp_session_build_uri (ValentSftpSession *session,
+                        const char        *path)
+{
+  g_autofree char *host = NULL;
+  g_autofree char *user = NULL;
+  g_autofree char *path_fallback = NULL;
+  const char *remote_path = path;
+
+  g_assert (session != NULL);
+
+  host = sftp_format_host (session->host);
+
+  if (session->username != NULL)
+    user = g_uri_escape_string (session->username, NULL, FALSE);
+
+  if (remote_path == NULL || *remote_path == '\0')
+    remote_path = "/";
+  else if (*remote_path != '/')
+    {
+      path_fallback = g_strdup_printf ("/%s", remote_path);
+      remote_path = path_fallback;
+    }
+
+  return g_strdup_printf ("sftp://%s%s%s:%u%s",
+                          user != NULL ? user : "",
+                          user != NULL ? "@" : "",
+                          host,
+                          session->port,
+                          remote_path);
+}
+
+static gboolean
+sftp_uri_matches (const char *uri,
+                  const char *host,
+                  uint16_t    port)
+{
+  g_autoptr (GUri) parsed = NULL;
+  const char *parsed_host = NULL;
+  int parsed_port;
+
+  g_assert (uri != NULL);
+  g_assert (host != NULL);
+
+  parsed = g_uri_parse (uri, G_URI_FLAGS_PARSE_RELAXED, NULL);
+
+  if (parsed == NULL)
+    return FALSE;
+
+  parsed_host = g_uri_get_host (parsed);
+
+  if (!g_str_equal (g_uri_get_scheme (parsed), "sftp") ||
+      !g_str_equal (parsed_host, host))
+    return FALSE;
+
+  parsed_port = g_uri_get_port (parsed);
+  if (parsed_port == -1)
+    parsed_port = 22;
+
+  return port == 0 || parsed_port == port;
+}
+
 
 static ValentSftpSession *
 sftp_session_new (ValentSftpPlugin *self,
@@ -105,10 +178,12 @@ sftp_session_new (ValentSftpPlugin *self,
   ValentSftpSession *session;
   g_autofree char *host = NULL;
   int64_t port;
+  const char *ip = NULL;
   const char *password;
   const char *username;
   JsonArray *multi_paths = NULL;
   JsonArray *path_names = NULL;
+  const char *path = NULL;
 
   /* Ultimately, these are the only packet fields we really need */
   if (!valent_packet_get_int (packet, "port", &port) ||
@@ -119,12 +194,13 @@ sftp_session_new (ValentSftpPlugin *self,
       return NULL;
     }
 
-  if ((host = get_device_host (self)) == NULL)
-    {
-      const char *ip = NULL;
-      if (valent_packet_get_string (packet, "ip", &ip))
-        host = g_strdup (ip);
-    }
+  /* Prefer the packet address, since devices may advertise a Wi-Fi Direct
+   * endpoint that differs from the KDE Connect control channel.
+   */
+  if (valent_packet_get_string (packet, "ip", &ip))
+    host = g_strdup (ip);
+  else
+    host = get_device_host (self);
 
   if (host == NULL)
     {
@@ -143,10 +219,7 @@ sftp_session_new (ValentSftpPlugin *self,
   if (valent_packet_get_string (packet, "user", &username))
     session->username = g_strdup (username);
 
-  if (session->username != NULL)
-    session->uri = g_strdup_printf ("sftp://%s@%s:%u/", session->username, session->host, session->port);
-  else
-    session->uri = g_strdup_printf ("sftp://%s:%u/", session->host, session->port);
+  session->uri = sftp_session_build_uri (session, "/");
 
   if (valent_packet_get_string (packet, "password", &password))
     session->password = g_strdup (password);
@@ -159,26 +232,25 @@ sftp_session_new (ValentSftpPlugin *self,
 
       for (unsigned int i = 0; i < n_paths && i < n_names; i++)
         {
-          const char *path = json_array_get_string_element (multi_paths, i);
+          const char *remote_path = json_array_get_string_element (multi_paths, i);
           const char *name = json_array_get_string_element (path_names, i);
           g_autofree char *uri = NULL;
 
-          if (session->username != NULL)
-            uri = g_strdup_printf ("sftp://%s@%s:%u%s",
-                                   session->username,
-                                   session->host,
-                                   session->port,
-                                   path);
-          else
-            uri = g_strdup_printf ("sftp://%s:%u%s",
-                                   session->host,
-                                   session->port,
-                                   path);
+          uri = sftp_session_build_uri (session, remote_path);
 
           g_hash_table_replace (session->paths,
                                 g_steal_pointer (&uri),
                                 g_strdup (name));
         }
+    }
+  else if (valent_packet_get_string (packet, "path", &path))
+    {
+      g_autofree char *uri = NULL;
+
+      uri = sftp_session_build_uri (session, path);
+      g_hash_table_replace (session->paths,
+                            g_steal_pointer (&uri),
+                            g_strdup (_("Files")));
     }
 
   return session;
@@ -237,19 +309,19 @@ static gboolean
 sftp_session_find (ValentSftpPlugin *self)
 {
   g_autofree char *host = NULL;
-  g_autofree char *host_pattern = NULL;
-  g_autoptr (GRegex) regex = NULL;
   g_autolist (GMount) mounts = NULL;
+  uint16_t port = 0;
 
   if (self->session && self->session->mount)
     return TRUE;
 
-  if ((host = get_device_host (self)) == NULL)
+  if (self->session != NULL)
+    {
+      host = g_strdup (self->session->host);
+      port = self->session->port;
+    }
+  else if ((host = get_device_host (self)) == NULL)
     return FALSE;
-
-  // TODO: is this reasonable?
-  host_pattern = g_strdup_printf ("sftp://(%s):([22-65535])", host);
-  regex = g_regex_new (host_pattern, G_REGEX_OPTIMIZE, 0, NULL);
 
   /* Search through each mount in the volume monitor... */
   mounts = g_volume_monitor_get_mounts (self->monitor);
@@ -263,7 +335,7 @@ sftp_session_find (ValentSftpPlugin *self)
       uri = g_file_get_uri (root);
 
       /* The URI matches our mount */
-      if (g_regex_match (regex, uri, 0, NULL))
+      if (sftp_uri_matches (uri, host, port))
         {
           if (self->session == NULL)
             self->session = g_new0 (ValentSftpSession, 1);
@@ -299,7 +371,7 @@ on_mount_added (GVolumeMonitor   *volume_monitor,
   root = g_mount_get_root (mount);
   uri = g_file_get_uri (root);
 
-  if (g_strcmp0 (self->session->uri, uri) == 0)
+  if (sftp_uri_matches (uri, self->session->host, self->session->port))
     {
       g_set_object (&self->session->mount, mount);
       valent_sftp_plugin_update_menu (self);
@@ -322,7 +394,7 @@ on_mount_removed (GVolumeMonitor   *volume_monitor,
   root = g_mount_get_root (mount);
   uri = g_file_get_uri (root);
 
-  if (g_strcmp0 (self->session->uri, uri) == 0)
+  if (sftp_uri_matches (uri, self->session->host, self->session->port))
     {
       g_clear_object (&self->session->mount);
       valent_sftp_plugin_update_menu (self);
@@ -970,4 +1042,3 @@ static void
 valent_sftp_plugin_init (ValentSftpPlugin *self)
 {
 }
-

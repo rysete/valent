@@ -18,6 +18,7 @@ plugin_tests = [
   'mousepad',
   'mpris',
   'notification',
+  'p2p',
   'ping',
   # 'pipewire',
   'presenter',
@@ -38,4 +39,3 @@ if get_option('plugins')
     endif
   endforeach
 endif
-

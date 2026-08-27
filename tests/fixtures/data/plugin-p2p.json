@@ -1,0 +1,60 @@
+{
+  "identity": {
+    "id": 0,
+    "type": "kdeconnect.identity",
+    "body": {
+      "deviceId": "00000000_0000_0000_0000_000000000001",
+      "deviceName": "Test Device",
+      "deviceType": "phone",
+      "incomingCapabilities": [
+        "kdeconnect.p2p.request",
+        "kdeconnect.p2p.response"
+      ],
+      "outgoingCapabilities": [
+        "kdeconnect.p2p.request",
+        "kdeconnect.p2p.response"
+      ],
+      "protocolVersion": 8
+    }
+  },
+  "peer-identity": {
+    "id": 0,
+    "type": "kdeconnect.identity",
+    "body": {
+      "deviceId": "00000000_0000_0000_0000_000000000002",
+      "deviceName": "Peer Device",
+      "deviceType": "phone",
+      "incomingCapabilities": [
+        "kdeconnect.p2p.request",
+        "kdeconnect.p2p.response"
+      ],
+      "outgoingCapabilities": [
+        "kdeconnect.p2p.request",
+        "kdeconnect.p2p.response"
+      ],
+      "protocolVersion": 8
+    }
+  },
+  "p2p-request": {
+    "id": 0,
+    "type": "kdeconnect.p2p.request",
+    "body": {
+      "action": "start"
+    }
+  },
+  "p2p-stop": {
+    "id": 0,
+    "type": "kdeconnect.p2p.request",
+    "body": {
+      "action": "stop"
+    }
+  },
+  "p2p-response": {
+    "id": 0,
+    "type": "kdeconnect.p2p.response",
+    "body": {
+      "ip": "192.168.49.1",
+      "port": 1739
+    }
+  }
+}
