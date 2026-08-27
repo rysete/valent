@@ -1212,12 +1212,35 @@ valent_lan_channel_service_identify (ValentChannelService *service,
                                                        self->port);
       valent_lan_channel_service_socket_queue (self, address);
 
-      /* Direct subnet broadcast for Wi-Fi interfaces */
+      /* Direct subnet broadcast for Wi-Fi interfaces and common hotspot/P2P subnets */
       {
-        g_autoptr (GSocketAddress) local_bcast = g_inet_socket_address_new_from_string ("192.168.0.255",
-                                                                                         self->port);
-        if (local_bcast != NULL)
-          valent_lan_channel_service_socket_queue (self, local_bcast);
+        static const char *subnets[] = {
+          "192.168.0.255",
+          "192.168.1.255",
+          "192.168.43.255",
+          "192.168.49.255",
+        };
+        for (size_t i = 0; i < G_N_ELEMENTS (subnets); i++)
+          {
+            g_autoptr (GSocketAddress) local_bcast = g_inet_socket_address_new_from_string (subnets[i], self->port);
+            if (local_bcast != NULL)
+              valent_lan_channel_service_socket_queue (self, local_bcast);
+          }
+      }
+
+      /* Identify to custom device addresses configured in GSettings */
+      {
+        g_autoptr (GSettings) settings = g_settings_new ("ca.andyholmes.Valent");
+        g_auto (GStrv) addresses = g_settings_get_strv (settings, "device-addresses");
+        if (addresses != NULL)
+          {
+            for (size_t i = 0; addresses[i] != NULL; i++)
+              {
+                g_autoptr (GSocketConnectable) net = g_network_address_parse (addresses[i], self->port, NULL);
+                if (net != NULL)
+                  valent_lan_channel_service_socket_queue_resolve (self, net);
+              }
+          }
       }
 
       /* Identify to online Tailscale network peers
