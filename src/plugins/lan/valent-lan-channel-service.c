@@ -1206,11 +1206,19 @@ valent_lan_channel_service_identify (ValentChannelService *service,
           valent_lan_channel_service_socket_queue_resolve (self, item);
         }
 
-      /* Broadcast to the network
+      /* Broadcast to the network (global and local subnet)
        */
       address = g_inet_socket_address_new_from_string (self->broadcast_address,
                                                        self->port);
       valent_lan_channel_service_socket_queue (self, address);
+
+      /* Direct subnet broadcast for Wi-Fi interfaces */
+      {
+        g_autoptr (GSocketAddress) local_bcast = g_inet_socket_address_new_from_string ("192.168.0.255",
+                                                                                         self->port);
+        if (local_bcast != NULL)
+          valent_lan_channel_service_socket_queue (self, local_bcast);
+      }
 
       /* Identify to online Tailscale network peers
        */
