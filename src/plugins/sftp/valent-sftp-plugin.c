@@ -121,6 +121,13 @@ sftp_session_new (ValentSftpPlugin *self,
 
   if ((host = get_device_host (self)) == NULL)
     {
+      const char *ip = NULL;
+      if (valent_packet_get_string (packet, "ip", &ip))
+        host = g_strdup (ip);
+    }
+
+  if (host == NULL)
+    {
       g_warning ("%s(): failed to get host address",
                  G_STRFUNC);
       return NULL;

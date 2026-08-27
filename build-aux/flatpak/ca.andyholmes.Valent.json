@@ -10,7 +10,6 @@
         "--filesystem=xdg-download",
         "--filesystem=xdg-run/gvfsd",
         "--filesystem=xdg-run/pipewire-0:ro",
-        "--filesystem=/var/run/tailscale:ro",
         "--filesystem=~/.mozilla/firefox/firefox-mpris:ro",
         "--filesystem=~/.var/app/org.mozilla.firefox/data/firefox-mpris:ro",
         "--own-name=org.mpris.MediaPlayer2.Valent.*",
@@ -367,9 +366,8 @@
             ],
             "sources": [
                 {
-                    "type": "git",
-                    "url": "https://github.com/andyholmes/valent.git",
-                    "branch": "main"
+                    "type": "dir",
+                    "path": "../../"
                 }
             ]
         }

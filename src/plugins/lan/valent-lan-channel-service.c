@@ -1045,12 +1045,16 @@ valent_lan_channel_service_identify_tailscale (ValentLanChannelService *self)
   const char *member_name = NULL;
   JsonNode *peer_node = NULL;
   const char *request = "GET /localapi/v0/status HTTP/1.1\r\nHost: local-tailscaled.sock\r\n\r\n";
-  const char *socket_path = "/var/run/tailscale/tailscaled.sock";
+  const char *socket_path = "/run/tailscale/tailscaled.sock";
   g_autofree char *header_line = NULL;
   g_autoptr (GByteArray) body_bytes = NULL;
 
   if (access (socket_path, F_OK) != 0)
-    return;
+    {
+      socket_path = "/var/run/tailscale/tailscaled.sock";
+      if (access (socket_path, F_OK) != 0)
+        return;
+    }
 
   socket = g_socket_new (G_SOCKET_FAMILY_UNIX,
                          G_SOCKET_TYPE_STREAM,
