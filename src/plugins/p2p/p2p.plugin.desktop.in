@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileCopyrightText: Andy Holmes <andrew.g.r.holmes@gmail.com>
+
+[Plugin]
+Module=p2p
+Name=Wi-Fi Direct P2P
+Description=Orchestrate high-speed Wi-Fi Direct P2P transfers and SFTP
+Icon=network-wireless-symbolic
+Builtin=true
+Embedded=valent_p2p_plugin_register_types
+Authors=Andy Holmes;
+Copyright=Copyright © Andy Holmes
+Version=@PLUGINS_VERSION@
+Website=https://valent.andyholmes.ca
+Help=https://valent.andyholmes.ca/help
+X-DevicePluginIncoming=kdeconnect.p2p.request;kdeconnect.p2p.response
+X-DevicePluginOutgoing=kdeconnect.p2p.request;kdeconnect.p2p.response

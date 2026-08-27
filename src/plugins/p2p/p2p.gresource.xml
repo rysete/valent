@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/ca/andyholmes/Valent/plugins/p2p">
+    <file compressed="true">p2p.plugin</file>
+  </gresource>
+</gresources>

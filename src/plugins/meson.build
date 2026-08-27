@@ -35,6 +35,7 @@ plugins = [
   'mousepad',
   'mpris',
   'notification',
+  'p2p',
   'ping',
   'pipewire',
   'presenter',

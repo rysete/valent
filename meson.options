@@ -158,6 +158,12 @@ option('plugin_notification',
         value: true,
 )
 
+option('plugin_p2p',
+  description: 'Enable Wi-Fi Direct P2P plugin',
+         type: 'boolean',
+        value: true,
+)
+
 option('plugin_ping',
   description: 'Enable Ping plugin',
          type: 'boolean',
