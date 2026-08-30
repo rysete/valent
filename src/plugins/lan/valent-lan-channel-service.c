@@ -1033,8 +1033,8 @@ valent_lan_channel_service_identify_tailscale (ValentLanChannelService *self)
   g_autoptr (GSocket) socket = NULL;
   g_autoptr (GSocketAddress) saddr = NULL;
   g_autoptr (GSocketConnection) connection = NULL;
-  g_autoptr (GInputStream) istream = NULL;
-  g_autoptr (GOutputStream) ostream = NULL;
+  GInputStream *istream = NULL;
+  GOutputStream *ostream = NULL;
   g_autoptr (GDataInputStream) dstream = NULL;
   g_autoptr (GError) error = NULL;
   g_autoptr (JsonParser) parser = NULL;
@@ -1044,7 +1044,7 @@ valent_lan_channel_service_identify_tailscale (ValentLanChannelService *self)
   JsonObjectIter iter;
   const char *member_name = NULL;
   JsonNode *peer_node = NULL;
-  const char *request = "GET /localapi/v0/status HTTP/1.1\r\nHost: local-tailscaled.sock\r\n\r\n";
+  const char *request = "GET /localapi/v0/status HTTP/1.0\r\nHost: local-tailscaled.sock\r\nConnection: close\r\n\r\n";
   const char *socket_path = "/run/tailscale/tailscaled.sock";
   g_autofree char *header_line = NULL;
   g_autoptr (GByteArray) body_bytes = NULL;
@@ -1062,6 +1062,8 @@ valent_lan_channel_service_identify_tailscale (ValentLanChannelService *self)
                          NULL);
   if (socket == NULL)
     return;
+
+  g_socket_set_timeout (socket, 2);
 
   saddr = g_unix_socket_address_new (socket_path);
   if (!g_socket_connect (socket, saddr, NULL, NULL))
@@ -1082,7 +1084,7 @@ valent_lan_channel_service_identify_tailscale (ValentLanChannelService *self)
 
   /* Read HTTP response status line */
   header_line = g_data_input_stream_read_line (dstream, NULL, NULL, &error);
-  if (header_line == NULL || !g_str_has_prefix (header_line, "HTTP/1.1 200"))
+  if (header_line == NULL || (!g_str_has_prefix (header_line, "HTTP/1.1 200") && !g_str_has_prefix (header_line, "HTTP/1.0 200")))
     return;
 
   /* Read headers until empty line */
