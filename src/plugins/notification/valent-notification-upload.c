@@ -149,8 +149,8 @@ _gtk_icon_theme_get_largest_file (GIcon   *icon,
       int size;
 
       size = _gtk_icon_theme_get_largest_size (icon_theme, names[i]);
-      if (size == 0)
-        continue;
+      if (size <= 0)
+        size = 48;
 
       paintable = gtk_icon_theme_lookup_icon (icon_theme,
                                               names[i],
