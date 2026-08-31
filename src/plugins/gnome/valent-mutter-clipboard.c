@@ -551,7 +551,10 @@ valent_mutter_clipboard_write_bytes (ValentClipboardAdapter *adapter,
   g_clear_pointer (&self->content, g_bytes_unref);
   self->content = g_bytes_ref (bytes);
   g_clear_pointer (&self->mimetypes, g_variant_unref);
-  self->mimetypes = g_variant_new_strv (VALENT_STRV_INIT (mimetype), -1);
+  if (g_str_has_prefix (mimetype, "text/plain"))
+    self->mimetypes = g_variant_new_strv (VALENT_STRV_INIT ("text/plain;charset=utf-8", "text/plain", "UTF8_STRING", "STRING"), -1);
+  else
+    self->mimetypes = g_variant_new_strv (VALENT_STRV_INIT (mimetype), -1);
   g_variant_ref_sink (self->mimetypes);
   self->timestamp = valent_timestamp_ms ();
 
