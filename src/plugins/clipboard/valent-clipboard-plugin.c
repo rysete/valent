@@ -164,8 +164,8 @@ on_auto_pull_changed (GSettings             *settings,
   device = valent_object_get_parent (VALENT_OBJECT (self));
   state = valent_device_get_state (device);
 
-  if ((state & VALENT_DEVICE_STATE_CONNECTED) != 0 ||
-      (state & VALENT_DEVICE_STATE_PAIRED) != 0)
+  if ((state & VALENT_DEVICE_STATE_CONNECTED) == 0 ||
+      (state & VALENT_DEVICE_STATE_PAIRED) == 0)
     return;
 
   destroy = valent_object_ref_cancellable (VALENT_OBJECT (self));
@@ -196,8 +196,8 @@ on_auto_push_changed (GSettings             *settings,
   device = valent_object_get_parent (VALENT_OBJECT (self));
   state = valent_device_get_state (device);
 
-  if ((state & VALENT_DEVICE_STATE_CONNECTED) != 0 ||
-      (state & VALENT_DEVICE_STATE_PAIRED) != 0)
+  if ((state & VALENT_DEVICE_STATE_CONNECTED) == 0 ||
+      (state & VALENT_DEVICE_STATE_PAIRED) == 0)
     return;
 
   destroy = valent_object_ref_cancellable (VALENT_OBJECT (self));
