@@ -198,6 +198,31 @@ valent_p2p_plugin_handle_packet (ValentDevicePlugin *plugin,
     handle_p2p_response (self, packet);
 }
 
+static void
+valent_p2p_trigger_nm_find (void)
+{
+  g_autoptr (GDBusConnection) system_bus = NULL;
+  g_autoptr (GError) error = NULL;
+
+  system_bus = g_bus_get_sync (G_BUS_TYPE_SYSTEM, NULL, &error);
+  if (system_bus == NULL)
+    return;
+
+  /* Call StartFind on NetworkManager Device 41 (p2p-dev-wlan0) */
+  g_dbus_connection_call (system_bus,
+                          "org.freedesktop.NetworkManager",
+                          "/org/freedesktop/NetworkManager/Devices/41",
+                          "org.freedesktop.NetworkManager.Device.WifiP2P",
+                          "StartFind",
+                          g_variant_new ("(@a{sv})", g_variant_new_array (G_VARIANT_TYPE ("{sv}"), NULL, 0)),
+                          NULL,
+                          G_DBUS_CALL_FLAGS_NONE,
+                          1000,
+                          NULL,
+                          NULL,
+                          NULL);
+}
+
 void
 valent_p2p_plugin_request_link (ValentP2PPlugin *self)
 {
@@ -205,6 +230,9 @@ valent_p2p_plugin_request_link (ValentP2PPlugin *self)
   g_autoptr (JsonNode) packet = NULL;
 
   g_return_if_fail (VALENT_IS_P2P_PLUGIN (self));
+
+  /* Trigger local Wi-Fi Direct hardware probe beacon scan */
+  valent_p2p_trigger_nm_find ();
 
   valent_packet_init (&builder, "kdeconnect.p2p.request");
   json_builder_set_member_name (builder, "action");
