@@ -354,6 +354,20 @@ g_file_query_info_cb (GFile        *file,
   json_builder_add_string_value (builder, filename);
   json_builder_set_member_name (builder, "open");
   json_builder_add_boolean_value (builder, FALSE);
+
+  {
+    GDateTime *mtime = g_file_info_get_modification_date_time (info);
+    if (mtime != NULL)
+      {
+        int64_t mtime_ms = g_date_time_to_unix (mtime) * 1000;
+        json_builder_set_member_name (builder, "lastModified");
+        json_builder_add_int_value (builder, mtime_ms);
+        json_builder_set_member_name (builder, "creationTime");
+        json_builder_add_int_value (builder, mtime_ms);
+        g_date_time_unref (mtime);
+      }
+  }
+
   packet = valent_packet_end (&builder);
   valent_packet_set_payload_size (packet, payload_size);
 
@@ -393,7 +407,9 @@ valent_share_upload_add_file (ValentShareUpload *upload,
 
   g_file_query_info_async (file,
                            G_FILE_ATTRIBUTE_STANDARD_NAME","
-                           G_FILE_ATTRIBUTE_STANDARD_SIZE,
+                           G_FILE_ATTRIBUTE_STANDARD_SIZE","
+                           G_FILE_ATTRIBUTE_TIME_MODIFIED","
+                           G_FILE_ATTRIBUTE_TIME_CREATED,
                            G_FILE_QUERY_INFO_NONE,
                            G_PRIORITY_DEFAULT,
                            destroy,
