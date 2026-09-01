@@ -412,8 +412,10 @@ ei_source_dispatch (GSource     *source,
         case EI_EVENT_TOUCH_DOWN:
         case EI_EVENT_TOUCH_UP:
         case EI_EVENT_TOUCH_MOTION:
-#if defined(EI_EVENT_TEXT_KEYSYM) || defined(LIBEI_1_4) || 1
+#ifdef EI_EVENT_TEXT_KEYSYM
         case EI_EVENT_TEXT_KEYSYM:
+#endif
+#ifdef EI_EVENT_TEXT_UTF8
         case EI_EVENT_TEXT_UTF8:
 #endif
         default:
