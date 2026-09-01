@@ -279,7 +279,7 @@ ei_source_dispatch (GSource     *source,
 
       VALENT_NOTE ("Event %s", ei_event_type_to_string (event_type));
 
-      switch ((enum ei_event_type)event_type)
+      switch ((int)event_type)
         {
         case EI_EVENT_CONNECT:
           {
@@ -412,8 +412,6 @@ ei_source_dispatch (GSource     *source,
         case EI_EVENT_TOUCH_DOWN:
         case EI_EVENT_TOUCH_UP:
         case EI_EVENT_TOUCH_MOTION:
-        case EI_EVENT_TEXT_KEYSYM:
-        case EI_EVENT_TEXT_UTF8:
         default:
           break;
         }
