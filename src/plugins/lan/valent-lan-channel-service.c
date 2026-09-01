@@ -1214,17 +1214,20 @@ valent_lan_channel_service_identify (ValentChannelService *service,
                                                        self->port);
       valent_lan_channel_service_socket_queue (self, address);
 
-      /* Direct subnet broadcast for Wi-Fi interfaces and common hotspot/P2P subnets */
+      /* Direct subnet broadcast for all active network interfaces and common P2P/Hotspot subnets */
       {
-        static const char *subnets[] = {
+        static const char *default_subnets[] = {
           "192.168.0.255",
           "192.168.1.255",
           "192.168.43.255",
           "192.168.49.255",
+          "192.168.50.255",
+          "172.20.10.15", /* iOS Personal Hotspot broadcast fallback */
         };
-        for (size_t i = 0; i < G_N_ELEMENTS (subnets); i++)
+
+        for (size_t i = 0; i < G_N_ELEMENTS (default_subnets); i++)
           {
-            g_autoptr (GSocketAddress) local_bcast = g_inet_socket_address_new_from_string (subnets[i], self->port);
+            g_autoptr (GSocketAddress) local_bcast = g_inet_socket_address_new_from_string (default_subnets[i], self->port);
             if (local_bcast != NULL)
               valent_lan_channel_service_socket_queue (self, local_bcast);
           }
