@@ -103,8 +103,12 @@ jobs:
           python3 -c "
           import urllib.request, urllib.parse, json, os
 
-          token = '7666976389:AAG3sjWhNBFWEyfifTXlaHOEMp7Hdy1rGs0'
-          chat_id = '943936254'
+          token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+          chat_id = os.environ.get('TELEGRAM_CHAT_ID', '')
+          if not token or not chat_id:
+              print('Telegram notification skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set.')
+              exit(0)
+
           status = os.environ.get('STATUS', 'unknown')
           commit_sha = os.environ.get('COMMIT_SHA', '')[:7]
           commit_msg = os.environ.get('COMMIT_MSG', '').strip()
@@ -122,9 +126,9 @@ jobs:
           msg = (
               f'{emoji} *[Forgejo CI/CD - Valent App & Extension]*\n\n'
               f'{status_text}\n\n'
-              f'• *Repositório:* \`{repo}\`\n'
-              f'• *Commit:* \`{commit_sha}\` - {commit_msg}\n'
-              f'• *Status:* \`{status.upper()}\`\n\n'
+              f'• *Repositório:* `{repo}`\n'
+              f'• *Commit:* `{commit_sha}` - {commit_msg}\n'
+              f'• *Status:* `{status.upper()}`\n\n'
               f'{action_text}'
           )
 
@@ -147,3 +151,5 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
           REPO_NAME: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
