@@ -606,6 +606,17 @@ valent_share_plugin_upload_file (ValentSharePlugin *self,
                             g_object_ref (self->upload));
     }
 
+  /* Trigger automatic P2P link negotiation if available */
+  {
+    ValentDevice *device = valent_object_get_parent (VALENT_OBJECT (self));
+    if (device != NULL)
+      {
+        GActionGroup *actions = G_ACTION_GROUP (device);
+        if (actions != NULL && g_action_group_has_action (actions, "p2p.request-link"))
+          g_action_group_activate_action (actions, "p2p.request-link", NULL);
+      }
+  }
+
   valent_share_upload_add_file (VALENT_SHARE_UPLOAD (self->upload), file);
 }
 
